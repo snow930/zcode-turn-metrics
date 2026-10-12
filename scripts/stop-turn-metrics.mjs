@@ -1,18 +1,15 @@
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import {
+  formatCollapsibleTurnDetails,
   formatCompactStopBanner,
-  fmtMs,
-  fmtPct,
-  fmtTok,
-  fmtTps,
   querySessionTurns,
   resolveZCodeDbPath,
 } from "./metrics-core.mjs";
 
 const MARKER = "<!-- zcode-turn-metrics -->";
 
-function appendFooterToLastTextPart(sessionId, turnSummary, banner) {
+function appendFooterToLastTextPart(sessionId, turnSummary) {
   try {
     const dbPath = resolveZCodeDbPath();
     const db = new DatabaseSync(dbPath, { open: true });
@@ -35,10 +32,14 @@ function appendFooterToLastTextPart(sessionId, turnSummary, banner) {
       }
       if (!partRow) return;
       const dataObj = JSON.parse(partRow.data);
-      if (typeof dataObj.text !== "string" || dataObj.text.includes(MARKER)) return;
+      if (typeof dataObj.text !== "string") return;
 
-      const footer = `\n\n---\n${MARKER}\n> 📊 **本轮指标** ｜ ${banner}`;
-      dataObj.text = dataObj.text.trimEnd() + footer;
+      const detailsBlock = formatCollapsibleTurnDetails(turnSummary, MARKER);
+      const baseText = dataObj.text.includes(MARKER)
+        ? dataObj.text.slice(0, dataObj.text.indexOf(MARKER)).replace(/\n+---\s*$/u, "").trimEnd()
+        : dataObj.text.trimEnd();
+
+      dataObj.text = baseText + detailsBlock;
       db.prepare("UPDATE part SET data = ?, time_updated = ? WHERE id = ?").run(
         JSON.stringify(dataObj),
         Date.now(),
@@ -70,11 +71,9 @@ function main() {
   const banner = formatCompactStopBanner(currentTurn);
 
   if (resolvedSessionId) {
-    appendFooterToLastTextPart(resolvedSessionId, currentTurn, banner);
+    appendFooterToLastTextPart(resolvedSessionId, currentTurn);
   }
 
-  // 输出 Stop Hook 结构：使用 decision:"block" + stopReason（不带 reason/systemMessage/additionalContext）
-  // 这样 ZCode 既不会触发模型继续生成，也不会报错，且在每轮底部的 Hook 图标弹窗中直接展示完整指标！
   process.stdout.write(
     JSON.stringify({
       decision: "block",

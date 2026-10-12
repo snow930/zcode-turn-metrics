@@ -278,22 +278,53 @@ export function querySessionTurns(sessionId, limitTurns = 10) {
 }
 
 export function formatCompactStopBanner(t) {
+  const ttftAvg = fmtMs(t.avgTtftMs ?? t.firstStepTtftMs);
+  const ppAvg = fmtTps(t.ppTpsUncached ?? t.ppTpsTotal);
+  const tgAvg = fmtTps(t.tgTps);
+  const hwSuffix = t.llamaHw?.draftAcceptance != null
+    ? ` · 草稿 ${t.llamaHw.draftAcceptance.toFixed(1)}%`
+    : "";
+  return `⏱ TTFT ${ttftAvg}  ·  ⚡ 预读取 ${ppAvg}  ·  🚀 解码 ${tgAvg}${hwSuffix}`;
+}
+
+export function formatCollapsibleTurnDetails(t, marker = "<!-- zcode-turn-metrics -->") {
+  const headline = formatCompactStopBanner(t);
   const ls = t.lastStep;
-  const ttftPart = t.stepsCount > 1
-    ? `TTFT 末步 ${fmtMs(ls.ttftMs)} (首步 ${fmtMs(t.firstStepTtftMs)} · 均 ${fmtMs(t.avgTtftMs)} · ${t.stepsCount}步)`
-    : `TTFT ${fmtMs(t.firstStepTtftMs)}`;
+  const cacheStr = `${fmtPct(t.cacheHitPercent)} (${fmtTok(t.cacheReadTokens)} / ${fmtTok(t.promptTokens)} tok)`;
+  const ppDetail = `未缓存计算 <code>${fmtTok(t.prefillTokens)} tok</code> @ <b>${fmtTps(t.ppTpsUncached)}</b> ｜ 总输入 <code>${fmtTok(t.promptTokens)} tok</code> @ <b>${fmtTps(t.ppTpsTotal)}</b> ｜ 缓存命中 <code>${cacheStr}</code>`;
+  const tgDetail = `输出 <code>${fmtTok(t.outputTokens)} tok</code>${t.reasoningTokens > 0 ? ` (思考 <code>${fmtTok(t.reasoningTokens)}</code>)` : ""} ｜ 均速 <b>${fmtTps(t.tgTps)}</b> ｜ 解码耗时 <code>${fmtMs(t.totalDecodeMs)}</code> ｜ 总耗时 <code>${fmtMs(t.totalDurationMs)}</code>`;
+  const ttftDetail = t.stepsCount > 1
+    ? `均值 <b>${fmtMs(t.avgTtftMs)}</b> ｜ 首步 <code>${fmtMs(t.firstStepTtftMs)}</code> ｜ 末步 <code>${fmtMs(ls.ttftMs)}</code> ｜ 累计 <code>${fmtMs(t.totalTtftMs)}</code>（共 ${t.stepsCount} 步）`
+    : `耗时 <b>${fmtMs(t.firstStepTtftMs)}</b>（单步完成）`;
 
-  const ppPart = t.stepsCount > 1
-    ? `预读取 末步 ${fmtTok(ls.prefillTokens)}/${fmtTok(ls.promptTokens)} tok @ ${fmtTps(ls.ppTpsUncached)} (本轮累计 ${fmtTok(t.prefillTokens)}/${fmtTok(t.promptTokens)} tok · 缓存 ${fmtPct(t.cacheHitPercent)})`
-    : `预读取 ${fmtTok(t.prefillTokens)}/${fmtTok(t.promptTokens)} tok · ${fmtTps(t.ppTpsUncached)}${t.cacheReadTokens > 0 ? ` (缓存 ${fmtPct(t.cacheHitPercent)})` : ""}`;
-
-  const tgPart = t.stepsCount > 1
-    ? `解码 末步 ${fmtTok(ls.outputTokens)} tok @ ${fmtTps(ls.tgTps)} (本轮累计 ${fmtTok(t.outputTokens)} tok · ${fmtTps(t.tgTps)} · ${fmtMs(t.totalDecodeMs)})`
-    : `解码 ${fmtTok(t.outputTokens)} tok · ${fmtTps(t.tgTps)} (${fmtMs(t.totalDecodeMs)})`;
-
-  const hwPart = t.llamaHw
-    ? ` ｜ 硬件PP ${fmtTok(t.llamaHw.promptTokens)}@${fmtTps(t.llamaHw.promptTps)} · 硬件TG ${fmtTps(t.llamaHw.evalTps)}${t.llamaHw.draftAcceptance != null ? ` · 草稿 ${t.llamaHw.draftAcceptance.toFixed(1)}%` : ""}`
+  const hwLine = t.llamaHw
+    ? `<li><b>本地硬件实测</b>：增量预读取 <code>${fmtTok(t.llamaHw.promptTokens)} tok</code> @ <b>${fmtTps(t.llamaHw.promptTps)}</b> (${fmtMs(t.llamaHw.promptMs)}) ｜ 硬件解码 <code>${fmtTok(t.llamaHw.evalTokens)} tok</code> @ <b>${fmtTps(t.llamaHw.evalTps)}</b>${t.llamaHw.draftAcceptance != null ? ` ｜ 草稿接受率 <b>${t.llamaHw.draftAcceptance.toFixed(1)}%</b>${t.llamaHw.draftMeanLen ? ` (L${t.llamaHw.draftMeanLen.toFixed(2)})` : ""}` : ""}</li>`
     : "";
 
-  return `⏱ ${ttftPart} ｜ ⚡ ${ppPart} ｜ 🚀 ${tgPart}${hwPart}`;
+  let stepTable = "";
+  if (t.steps && t.steps.length > 1) {
+    const rows = t.steps
+      .map((s, i) => {
+        const tgTok = s.reasoningTokens > 0 ? `${fmtTok(s.outputTokens)} (思${fmtTok(s.reasoningTokens)})` : fmtTok(s.outputTokens);
+        return `<tr><td>#${i + 1}</td><td>${fmtMs(s.ttftMs)}</td><td>${fmtTok(s.prefillTokens)} / ${fmtTok(s.promptTokens)} (${fmtPct(s.cacheHitPercent)})</td><td>${fmtTps(s.ppTpsUncached)}</td><td>${tgTok}</td><td>${fmtTps(s.tgTps)} (${fmtMs(s.decodeMs)})</td></tr>`;
+      })
+      .join("");
+    stepTable = `<table><thead><tr><th>步骤</th><th>TTFT</th><th>预读取 (未缓存/总 · 命中)</th><th>预读取速度</th><th>解码 Token</th><th>解码速度 (耗时)</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  return [
+    `\n\n${marker}`,
+    `<details>`,
+    `<summary>📊 <b>本轮均值</b> &nbsp;｜&nbsp; ${headline} &nbsp;<sub>(${t.stepsCount}步 · 点击展开明细)</sub></summary>`,
+    `<ul>`,
+    `<li><b>TTFT (首字延迟)</b>：${ttftDetail}</li>`,
+    `<li><b>预读取 (Prefill)</b>：${ppDetail}</li>`,
+    `<li><b>解码 (Decode)</b>：${tgDetail}</li>`,
+    hwLine,
+    `</ul>`,
+    stepTable,
+    `</details>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
