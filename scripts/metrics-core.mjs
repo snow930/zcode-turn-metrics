@@ -52,7 +52,7 @@ export function fmtPct(p) {
   return `${p >= 10 ? p.toFixed(1) : p.toFixed(2)}%`;
 }
 
-export function parseLlamaTasks(logDir = DEFAULT_LLAMA_LOG_DIR) {
+export function parseLlamaTasks(logDir = DEFAULT_LLAMA_LOG_DIR, minMtimeMs = 0) {
   try {
     if (!existsSync(logDir)) return [];
     const files = readdirSync(logDir)
@@ -62,8 +62,10 @@ export function parseLlamaTasks(logDir = DEFAULT_LLAMA_LOG_DIR) {
         const st = statSync(p);
         return { p, mtimeMs: st.mtimeMs };
       })
+      .filter((f) => f.mtimeMs >= minMtimeMs)
       .sort((a, b) => b.mtimeMs - a.mtimeMs)
       .slice(0, 2);
+    if (!files.length) return [];
     const byTask = new Map();
     for (const f of files) {
       const lines = readFileSync(f.p, "utf8").split(/\r?\n/);
@@ -198,8 +200,8 @@ export function aggregateTurnSteps(turnId, steps) {
 
   let llamaHw = null;
   const isLocal = steps.some((s) => /local|qwen|llama/i.test(s.providerId || "") || /\.gguf|qwen/i.test(s.modelId || ""));
-  if (isLocal) {
-    const tasks = parseLlamaTasks();
+  if (isLocal && steps[0].startedAt > 0) {
+    const tasks = parseLlamaTasks(DEFAULT_LLAMA_LOG_DIR, steps[0].startedAt - 60_000);
     const matched = tasks.findLast((t) => Math.abs((t.evalTokens || 0) - lastStep.outputTokens) <= 3);
     if (matched) llamaHw = matched;
   }
