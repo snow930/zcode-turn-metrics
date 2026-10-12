@@ -1,0 +1,15 @@
+{
+  "name": "turn-metrics",
+  "version": "0.1.0",
+  "description": "显示每轮会话的预读取（Prefill）、解码（Decode）、TTFT（首字时间）及多步模型调用性能明细",
+  "author": {
+    "name": "snow930"
+  },
+  "repository": "https://github.com/snow930/zcode-turn-metrics",
+  "homepage": "https://github.com/snow930/zcode-turn-metrics#readme",
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json",
+  "commands": "./commands",
+  "skills": "./skills",
+  "mcpServers": "./.mcp.json"
+}

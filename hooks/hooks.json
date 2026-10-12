@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stop-turn-metrics.mjs\"",
+            "timeout": 15,
+            "statusMessage": "计算本轮预读取 / 解码 / TTFT 指标"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "zcode-turn-metrics",
+  "plugins": [
+    {
+      "name": "turn-metrics",
+      "source": ".",
+      "version": "0.1.0",
+      "description": "显示每轮会话的预读取（Prefill）、解码（Decode）、TTFT（首字时间）及多步模型调用性能明细",
+      "displayName": "Turn Metrics",
+      "displayName_i18n": {
+        "zh-CN": "每轮性能指标 (预读取/解码/TTFT)"
+      },
+      "description_i18n": {
+        "zh-CN": "每轮会话显示预读取（Prefill）、解码（Decode）、TTFT（首字时间）及各步骤性能明细"
+      },
+      "category": "developer-tools"
+    }
+  ]
+}
