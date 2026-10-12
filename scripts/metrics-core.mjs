@@ -284,21 +284,26 @@ export function formatCompactStopBanner(t) {
   const hwSuffix = t.llamaHw?.draftAcceptance != null
     ? ` · 草稿 ${t.llamaHw.draftAcceptance.toFixed(1)}%`
     : "";
-  return `⏱ TTFT ${ttftAvg}  ·  ⚡ 预读取 ${ppAvg}  ·  🚀 解码 ${tgAvg}${hwSuffix}`;
+  return `TTFT ${ttftAvg} · 预读取 ${ppAvg} · 解码 ${tgAvg}${hwSuffix}`;
 }
 
 export function formatCollapsibleTurnDetails(t, marker = "<!-- zcode-turn-metrics -->") {
-  const headline = formatCompactStopBanner(t);
+  const ttftAvg = fmtMs(t.avgTtftMs ?? t.firstStepTtftMs);
+  const ppAvg = fmtTps(t.ppTpsUncached ?? t.ppTpsTotal);
+  const tgAvg = fmtTps(t.tgTps);
+  const hwInline = t.llamaHw?.draftAcceptance != null
+    ? ` · 草稿 <code>${t.llamaHw.draftAcceptance.toFixed(1)}%</code>`
+    : "";
   const ls = t.lastStep;
   const cacheStr = `${fmtPct(t.cacheHitPercent)} (${fmtTok(t.cacheReadTokens)} / ${fmtTok(t.promptTokens)} tok)`;
-  const ppDetail = `未缓存计算 <code>${fmtTok(t.prefillTokens)} tok</code> @ <b>${fmtTps(t.ppTpsUncached)}</b> ｜ 总输入 <code>${fmtTok(t.promptTokens)} tok</code> @ <b>${fmtTps(t.ppTpsTotal)}</b> ｜ 缓存命中 <code>${cacheStr}</code>`;
-  const tgDetail = `输出 <code>${fmtTok(t.outputTokens)} tok</code>${t.reasoningTokens > 0 ? ` (思考 <code>${fmtTok(t.reasoningTokens)}</code>)` : ""} ｜ 均速 <b>${fmtTps(t.tgTps)}</b> ｜ 解码耗时 <code>${fmtMs(t.totalDecodeMs)}</code> ｜ 总耗时 <code>${fmtMs(t.totalDurationMs)}</code>`;
+  const ppDetail = `未缓存计算 <code>${fmtTok(t.prefillTokens)} tok</code> @ <b>${fmtTps(t.ppTpsUncached)}</b> · 总输入 <code>${fmtTok(t.promptTokens)} tok</code> @ <b>${fmtTps(t.ppTpsTotal)}</b> · 缓存命中 <code>${cacheStr}</code>`;
+  const tgDetail = `输出 <code>${fmtTok(t.outputTokens)} tok</code>${t.reasoningTokens > 0 ? ` (思考 <code>${fmtTok(t.reasoningTokens)}</code>)` : ""} · 均速 <b>${fmtTps(t.tgTps)}</b> · 解码耗时 <code>${fmtMs(t.totalDecodeMs)}</code> · 总耗时 <code>${fmtMs(t.totalDurationMs)}</code>`;
   const ttftDetail = t.stepsCount > 1
-    ? `均值 <b>${fmtMs(t.avgTtftMs)}</b> ｜ 首步 <code>${fmtMs(t.firstStepTtftMs)}</code> ｜ 末步 <code>${fmtMs(ls.ttftMs)}</code> ｜ 累计 <code>${fmtMs(t.totalTtftMs)}</code>（共 ${t.stepsCount} 步）`
+    ? `均值 <b>${fmtMs(t.avgTtftMs)}</b> · 首步 <code>${fmtMs(t.firstStepTtftMs)}</code> · 末步 <code>${fmtMs(ls.ttftMs)}</code> · 累计 <code>${fmtMs(t.totalTtftMs)}</code>（共 ${t.stepsCount} 步）`
     : `耗时 <b>${fmtMs(t.firstStepTtftMs)}</b>（单步完成）`;
 
   const hwLine = t.llamaHw
-    ? `<li><b>本地硬件实测</b>：增量预读取 <code>${fmtTok(t.llamaHw.promptTokens)} tok</code> @ <b>${fmtTps(t.llamaHw.promptTps)}</b> (${fmtMs(t.llamaHw.promptMs)}) ｜ 硬件解码 <code>${fmtTok(t.llamaHw.evalTokens)} tok</code> @ <b>${fmtTps(t.llamaHw.evalTps)}</b>${t.llamaHw.draftAcceptance != null ? ` ｜ 草稿接受率 <b>${t.llamaHw.draftAcceptance.toFixed(1)}%</b>${t.llamaHw.draftMeanLen ? ` (L${t.llamaHw.draftMeanLen.toFixed(2)})` : ""}` : ""}</li>`
+    ? `<li><b>本地硬件实测</b>：增量预读取 <code>${fmtTok(t.llamaHw.promptTokens)} tok</code> @ <b>${fmtTps(t.llamaHw.promptTps)}</b> (${fmtMs(t.llamaHw.promptMs)}) · 硬件解码 <code>${fmtTok(t.llamaHw.evalTokens)} tok</code> @ <b>${fmtTps(t.llamaHw.evalTps)}</b>${t.llamaHw.draftAcceptance != null ? ` · 草稿接受率 <b>${t.llamaHw.draftAcceptance.toFixed(1)}%</b>${t.llamaHw.draftMeanLen ? ` (L${t.llamaHw.draftMeanLen.toFixed(2)})` : ""}` : ""}</li>`
     : "";
 
   let stepTable = "";
@@ -314,8 +319,7 @@ export function formatCollapsibleTurnDetails(t, marker = "<!-- zcode-turn-metric
 
   return [
     `\n\n${marker}`,
-    `<details>`,
-    `<summary>📊 <b>本轮均值</b> &nbsp;｜&nbsp; ${headline} &nbsp;<sub>(${t.stepsCount}步 · 点击展开明细)</sub></summary>`,
+    `<details><summary><b>本轮均值</b> · TTFT <code>${ttftAvg}</code> · 预读取 <code>${ppAvg}</code> · 解码 <code>${tgAvg}</code>${hwInline} (${t.stepsCount}步 · 点击展开)</summary>`,
     `<ul>`,
     `<li><b>TTFT (首字延迟)</b>：${ttftDetail}</li>`,
     `<li><b>预读取 (Prefill)</b>：${ppDetail}</li>`,
@@ -326,5 +330,5 @@ export function formatCollapsibleTurnDetails(t, marker = "<!-- zcode-turn-metric
     `</details>`,
   ]
     .filter(Boolean)
-    .join("\n");
+    .join("");
 }
